@@ -41,7 +41,7 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     #Import Agouti export files
     observations = pd.read_csv(os.path.join(general_folder_path, 'observations.csv'))
     assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory = False)
-    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'), sep = ';')
+    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'))
     
     #Combine annotations for sequences with multiple annotations
     list_columns = ['animalCount','animalTaxonID','animalIsDomesticated','animalScientificName','animalVernacularName','animalSex','animalAge', 'animalBehavior', 'deploymentID']
@@ -53,7 +53,8 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     
     #Join annotations and pickup-setup data
     ann = assets.set_index('sequence').join(observations_unique.set_index('sequenceID'))
-    data = ann.join(setup.set_index('sequenceId'))
+    ann.index.name = 'sequenceId'
+    data = ann.merge(setup, on='sequenceId', how='left')
     data.reset_index(level=0, inplace=True)
     data.rename(columns={'index': 'sequenceID'}, inplace=True)
     data = data.drop([ 'id','type','originalFilename','destination','directory','exiftoolData','order',
