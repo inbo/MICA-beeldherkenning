@@ -7,9 +7,35 @@ from skimage import measure
 from skimage.filters import roberts
 from scipy import ndimage as ndi
 import cv2
+import yaml
 
-from preprocessing.def_functions import remove_dup_columns, black_border, standard_box, size_box, devide_box
+root = os.path.join(os.getcwd(),'mica-beeldherkenning')
+print(root)
+config_path = os.path.join(root,'src', 'config.yml')
+def_functions_path = os.path.join(root, 'src', 'preprocessing')
 
+from src.preprocessing.def_functions import remove_dup_columns, black_border, standard_box, size_box, devide_box
+
+with open(config_path) as file:
+    config = yaml.load(file, Loader=yaml.FullLoader)
+print(config)
+
+general_folder_path = config['general_folder_path']
+general_folder_path = general_folder_path.replace("../", "")
+general_folder_path = general_folder_path.replace("/", os.sep)
+general_folder_path = os.path.join(root, general_folder_path)
+resized_folder_path = config['resized_folder_path']
+resized_folder_path = resized_folder_path.replace("../", "")
+resized_folder_path = resized_folder_path.replace("/", os.sep)
+resized_folder_path = os.path.join(root, resized_folder_path)
+preprocessing_output_path = config['preprocessing_output_path']
+preprocessing_output_path = preprocessing_output_path.replace("../", "")
+preprocessing_output_path = preprocessing_output_path.replace("/", os.sep)
+preprocessing_output_path = os.path.join(root, preprocessing_output_path)
+
+print(general_folder_path)
+print(resized_folder_path)
+print(preprocessing_output_path)
 
 def preprocessing(general_folder_path, resized_folder_path, preprocessing_output_path):
     
@@ -41,8 +67,10 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     #Import Agouti export files
     observations = pd.read_csv(os.path.join(general_folder_path, 'observations.csv'))
     assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory = False)
-    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'))
-    
+    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv', dtype={'BAR': 'S10'}))
+
+    observations.head()
+
     #Combine annotations for sequences with multiple annotations
     list_columns = ['animalCount','animalTaxonID','animalIsDomesticated','animalScientificName','animalVernacularName','animalSex','animalAge', 'animalBehavior', 'deploymentID']
     observations_unique = pd.DataFrame()   
@@ -71,11 +99,16 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             
     #Combine annotations from observations and pickup-setup into one column     
     data['Annotation'] = ""
+
+    data["isSetupPickup"] = data["isSetupPickup"].to_string()
+    data["isBlank"] = data["isBlank"].to_string()
+    data["animalVernacularName"] = data["animalVernacularName"].to_string()
+
     for i, row in data.iterrows():
-        if row.isSetupPickup == 'WAAR':
-            row.Annotation = ['PickupSetup']
-        elif row.isBlank == 'WAAR':
-            row.Annotation = ['Blank']
+        if row.isSetupPickup == True:
+            row.Annotation = 'PickupSetup'
+        elif row.isBlank == True:
+            row.Annotation = 'Blank'
         elif isinstance(row.animalVernacularName, list):
             row.Annotation = row.animalVernacularName
     
@@ -376,4 +409,4 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     boxes_single.to_csv(os.path.join(preprocessing_output_path, 'boxes_preprocessing_single.csv'), index=False, sep=';')
 
 if __name__ == '__main__':
-    preprocessing()
+    preprocessing(general_folder_path, resized_folder_path, preprocessing_output_path)
