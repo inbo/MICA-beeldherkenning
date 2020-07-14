@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
+
 from PIL import Image, ImageChops, ImageFilter
 from skimage import measure
 from skimage.filters import roberts
@@ -9,10 +10,14 @@ from scipy import ndimage as ndi
 import cv2
 import yaml
 
-root = os.path.join(os.getcwd(),'mica-beeldherkenning')
+root = os.getcwd()
+    if 'mica-beeldherkenning' in root:
+        print(root)
+    else:
+        root = os.path.join(os.getcwd(),'mica-beeldherkenning')
+
 print(root)
 config_path = os.path.join(root,'src', 'config.yml')
-def_functions_path = os.path.join(root, 'src', 'preprocessing')
 
 from src.preprocessing.def_functions import remove_dup_columns, black_border, standard_box, size_box, devide_box
 
@@ -66,8 +71,11 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     
     #Import Agouti export files
     observations = pd.read_csv(os.path.join(general_folder_path, 'observations.csv'))
-    assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory = False)
-    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv', dtype={'BAR': 'S10'}))
+    observations = observations.convert_dtypes()
+    assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory=False)
+    assets = assets.convert_dtypes()
+    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'), na_values='NULL', keep_default_na=False)
+    setup = setup.convert_dtypes()
 
     observations.head()
 
@@ -80,9 +88,8 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     observations_unique = remove_dup_columns(observations_unique)
     
     #Join annotations and pickup-setup data
-    ann = assets.set_index('sequence').join(observations_unique.set_index('sequenceID'))
-    ann.index.name = 'sequenceId'
-    data = ann.merge(setup, on='sequenceId', how='left')
+    ann = assets.merge(observations_unique, left_on='sequence', right_on='sequenceID')
+    data = ann.merge(setup, left_on='sequence', right_on='sequenceId')
     data.reset_index(level=0, inplace=True)
     data.rename(columns={'index': 'sequenceID'}, inplace=True)
     data = data.drop([ 'id','type','originalFilename','destination','directory','exiftoolData','order',
@@ -100,16 +107,12 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     #Combine annotations from observations and pickup-setup into one column     
     data['Annotation'] = ""
 
-    data["isSetupPickup"] = data["isSetupPickup"].to_string()
-    data["isBlank"] = data["isBlank"].to_string()
-    data["animalVernacularName"] = data["animalVernacularName"].to_string()
-
     for i, row in data.iterrows():
         if row.isSetupPickup == True:
             row.Annotation = 'PickupSetup'
         elif row.isBlank == True:
             row.Annotation = 'Blank'
-        elif isinstance(row.animalVernacularName, list):
+        else:
             row.Annotation = row.animalVernacularName
     
     #Remove row without annotation
