@@ -157,13 +157,17 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
         print(col)
 
     for i, row in data.iterrows():
-        if row.isSetupPickup == True:
-            row.Annotation = 'PickupSetup'
-        elif row.isBlank == True:
-            row.Annotation = 'Blank'
-        else:
-            row.Annotation = row.animalVernacularName
-    
+      if row["isSetupPickup"] == 'true':
+          data.iat[i, 'Annotation'] = 'PickupSetup'
+          print(i/len(data.index))
+          print("setup")
+      elif row["isBlank"] == 'true':
+          data.iat[i, 'Annotation'] = 'Blank'
+          print(i / len(data.index))
+          print("blank")
+
+
+    #data.Annotation = data.animalVernacularName
     data.isSetupPickup.value_counts()
     data.isBlank.value_counts()
     data.animalVernacularName.value_counts()
