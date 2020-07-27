@@ -112,6 +112,15 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             
     #Combine annotations from observations and pickup-setup into one column     
     data['Annotation'] = ""
+    #Dit stuk werkt niet naar wens. rijen met isSetupPickup == True, row.isBlank == True of row.animalVernacularName
+    #Krijgen niet de gewenste annotatie => hieronder een poging om dit te herschrijven.
+    # for i, row in data.iterrows():
+     #   if row.isSetupPickup == 'true':
+      #      row.Annotation = 'PickupSetup'
+       # elif row.isBlank == 'true':
+        #    row.Annotation = 'Blank'
+    #    else:
+     #       row.Annotation = row.animalVernacularName
     data_backup = data
     data_backup.isSetupPickup.value_counts()
     data_backup.isBlank.value_counts()
