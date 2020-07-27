@@ -70,11 +70,11 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     RATIO = 0.5
     
     #Import Agouti export files
-    observations = pd.read_csv(os.path.join(general_folder_path, 'observations.csv'))
+    observations = pd.read_csv(os.path.join(general_folder_path, 'observations.csv'), index_col=0)
     observations = observations.convert_dtypes()
-    assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory=False)
+    assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory=False, index_col=0)
     assets = assets.convert_dtypes()
-    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'), na_values='NULL', keep_default_na=False)
+    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'), na_values='NULL', keep_default_na=False, index_col=0)
     setup = setup.convert_dtypes()
 
     setup.isSetupPickup.value_counts()
