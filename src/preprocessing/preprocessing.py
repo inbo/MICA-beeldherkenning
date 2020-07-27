@@ -77,7 +77,13 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'), na_values='NULL', keep_default_na=False)
     setup = setup.convert_dtypes()
 
+    setup.isSetupPickup.value_counts()
+    observations.animalVernacularName.value_counts(dropna=False)
+
     observations.head()
+
+    for col in observations.columns:
+        print(col)
 
     #Combine annotations for sequences with multiple annotations
     list_columns = ['animalCount','animalTaxonID','animalIsDomesticated','animalScientificName','animalVernacularName','animalSex','animalAge', 'animalBehavior', 'deploymentID']
@@ -106,6 +112,10 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             
     #Combine annotations from observations and pickup-setup into one column     
     data['Annotation'] = ""
+    data_backup = data
+    data_backup.isSetupPickup.value_counts()
+    data_backup.isBlank.value_counts()
+    data_backup.animalVernacularName.value_counts()
 
     for i, row in data.iterrows():
         if row.isSetupPickup == True:
@@ -115,6 +125,11 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
         else:
             row.Annotation = row.animalVernacularName
     
+    data.isSetupPickup.value_counts()
+    data.isBlank.value_counts()
+    data.animalVernacularName.value_counts()
+    data.Annotation.value_counts(dropna= False) #=> Hieruit blijkt dat alle rijen een animalVernacularName hebben
+    data.Annotation.dtype
     #Remove row without annotation
     data['Annotation'].replace('', np.nan, inplace=True)
     data.dropna(subset=['Annotation'], inplace=True)
