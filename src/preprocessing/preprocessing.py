@@ -125,6 +125,36 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     data_backup.isSetupPickup.value_counts()
     data_backup.isBlank.value_counts()
     data_backup.animalVernacularName.value_counts()
+    #Na de aanpassing van de merge van inner (default) naar outer  zitten er terug setups en blanks in de data
+    #Daarom vullen we hier de kolom annotation hieronder manueel eerst met PickupSetup, vervolgens met Blank en dan met
+    #animalVernacularName
+    is_missing_setup = data["isSetupPickup"] == ''
+    not_missing_setup = data["isSetupPickup"] != ''
+    data_missing_setup = data[is_missing_setup]
+    data_Nmissing_setup = data[not_missing_setup]
+
+    data_missing_setup.isSetupPickup = 'false'
+    data_missing_setup.isSetupPickup.value_counts()
+
+    data = data_Nmissing_setup.append(data_missing_setup)
+
+    data["isBlank"] =  data["isBlank"].astype('str')
+    data.isBlank.dtype
+
+    is_missing_blank = data["isBlank"] == ''
+    is_Nmissing_blank = data["isBlank"] != ''
+    data_missing_blank = data[is_missing_blank]
+    data_Nmissing_blank = data[is_Nmissing_blank]
+
+    data_missing_blank.isBlank = 'false'
+    data_missing_blank.isBlank.value_counts(dropna= False)
+
+    data = data_Nmissing_blank.append(data_missing_blank)
+
+    #Remove "unnamed" columns
+    data.drop(data.columns[data.columns.str.contains('unnamed', case=False)], axis=1, inplace=True)
+    for col in data.columns:
+        print(col)
 
     for i, row in data.iterrows():
         if row.isSetupPickup == True:
