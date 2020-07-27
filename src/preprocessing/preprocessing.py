@@ -156,16 +156,9 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     for col in data.columns:
         print(col)
 
-    for i, row in data.iterrows():
-      if row["isSetupPickup"] == 'true':
-          data.iat[i, 'Annotation'] = 'PickupSetup'
-          print(i/len(data.index))
-          print("setup")
-      elif row["isBlank"] == 'true':
-          data.iat[i, 'Annotation'] = 'Blank'
-          print(i / len(data.index))
-          print("blank")
-
+    data['Annotation'] = np.where(data.isSetupPickup == 'true', 'PickupSetup', data.Annotation)
+    data['Annotation'] = np.where(data.isBlank == 'true', 'Blank', data.Annotation)
+    data['Annotation'] = np.where(data.Annotation == "",data.animalVernacularName, data.Annotation)
 
     #data.Annotation = data.animalVernacularName
     data.isSetupPickup.value_counts()
