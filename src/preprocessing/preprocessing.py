@@ -94,8 +94,8 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     observations_unique = remove_dup_columns(observations_unique)
     
     #Join annotations and pickup-setup data
-    ann = assets.merge(observations_unique, left_on='sequence', right_on='sequenceID')
-    data = ann.merge(setup, left_on='sequence', right_on='sequenceId')
+    ann = assets.merge(observations_unique, left_on='sequence', right_on='sequenceID', how='outer')
+    data = ann.merge(setup, left_on='sequence', right_on='sequenceId', how='outer')
     data.reset_index(level=0, inplace=True)
     data.rename(columns={'index': 'sequenceID'}, inplace=True)
     data = data.drop([ 'id','type','originalFilename','destination','directory','exiftoolData','order',
