@@ -11,10 +11,10 @@ import cv2
 import yaml
 
 root = os.getcwd()
-    if 'mica-beeldherkenning' in root:
-        print(root)
-    else:
-        root = os.path.join(os.getcwd(),'mica-beeldherkenning')
+if 'mica-beeldherkenning' in root:
+    print(root)
+else:
+    root = os.path.join(os.getcwd(),'mica-beeldherkenning')
 
 print(root)
 config_path = os.path.join(root,'src', 'config.yml')
@@ -103,11 +103,12 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
         
     #Combine deploymentID of observation and pickup-setup into one column    
     data['deployment'] = ""
-    for i, row in data.iterrows():
-        if isinstance(row.deploymentID, list):
-            row.deployment = row.deploymentID[0]
-        else:
-            row.deployment = row.deploymentId
+    data['deployment'] = np.where(isinstance(data.deploymentID, list), data.deploymentID[0], data.deploymentId)
+
+    data.deploymentID.value_counts()
+    data.deploymentId.value_counts()
+    data.deployment.value_counts()
+
     data = data.drop(['deploymentId', 'deploymentID'], axis=1)       
             
     #Combine annotations from observations and pickup-setup into one column     
@@ -203,7 +204,7 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             image_names_sequences = []
     
             data_deployment = data.loc[data['deployment'] == folder]
-            sequences = data_deployment.sequenceID.unique()
+            sequences = np.unique(data_deployment.sequenceID, return_inverse = True)
             
             for seq in sequences:
                 image_names_sequences.append(data_deployment.loc[data_deployment['sequenceID'] == seq].filename.tolist())
