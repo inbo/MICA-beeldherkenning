@@ -98,7 +98,6 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     data = ann.merge(setup, left_on='sequence', right_on='sequenceId', how='outer')
     data.reset_index(level=0, inplace=True)
     data.rename(columns={'index': 'sequenceID'}, inplace=True)
-    data = data.drop([ 'id','type','originalFilename','destination','directory','exiftoolData','order',
     data["filename"] = data["originalFilename"]
     data = data.drop(['id','type','originalFilename','destination','directory','exiftoolData','order',
                       'createdAt','isFavourite','observations','isTimeLapse','deployment'], axis=1)
