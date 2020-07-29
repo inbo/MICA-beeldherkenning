@@ -99,7 +99,11 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     data.reset_index(level=0, inplace=True)
     data.rename(columns={'index': 'sequenceID'}, inplace=True)
     data = data.drop([ 'id','type','originalFilename','destination','directory','exiftoolData','order',
+    data["filename"] = data["originalFilename"]
+    data = data.drop(['id','type','originalFilename','destination','directory','exiftoolData','order',
                       'createdAt','isFavourite','observations','isTimeLapse','deployment'], axis=1)
+
+    data.filename.value_counts()
         
     #Combine deploymentID of observation and pickup-setup into one column    
     data['deployment'] = ""
@@ -214,9 +218,11 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             sequences = sequences.tolist()
             data_deployment = data_deployment.drop(["sequenceID"], axis=1)
             data_deployment["sequenceID"] = sequences
-            
+
+            data_deployment.filename.value_counts()
             for seq in sequences:
-                image_names_sequences.append(data_deployment.loc[data_deployment['sequenceID'] == seq].filename.tolist())
+                print(seq)
+                image_names_sequences.append(data_deployment[data_deployment['sequenceID'] == seq].filename.tolist())
                 annotations_deployment.append(data_deployment[data_deployment['sequenceID'] == seq].Annotation.iloc[0])
     
             lengths = [len(i) for i in image_names_sequences]
