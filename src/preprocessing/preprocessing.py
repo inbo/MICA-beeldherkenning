@@ -236,13 +236,25 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                 # Import images sequence
                 images_sequence = pd.DataFrame()
                 for img in row.ImagesNames:
-                    if os.path.isfile(os.path.join(resized_folder_path,folder,img)):
+                    print(img)
+                    path = os.path.join(resized_folder_path,folder,img)
+                    print(path)
+                    if os.path.isfile(path):
                         image = Image.open(os.path.join(resized_folder_path, folder, img))
                         name = (image.filename).split('\\')[-1]
-                        images_sequence = images_sequence.append(pd.DataFrame([image, name]).T) 
+                        images_sequence = images_sequence.append(pd.DataFrame([image, name]).T)
+                    else: #provide logic for missing images
+                        image = ""
+                        name = ""
+                        images_sequence = images_sequence.append(pd.DataFrame([image, name]).T)
+
                 images_sequence.columns = ['Image', 'ImageName']
                 
                 if len(images_sequence) == len(row.ImagesNames) and len(images_sequence) > 0: #All images available
+
+                    #remove missing images from images_sequence
+                    is_image = images_sequence["Image"] != ""
+                    images_sequence = images_sequence[is_image]
                     
                     #Import sequence
                     images_matrices = []
