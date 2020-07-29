@@ -103,7 +103,8 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
         
     #Combine deploymentID of observation and pickup-setup into one column    
     data['deployment'] = ""
-    data['deployment'] = np.where(isinstance(data.deploymentID, list), data.deploymentID[0], data.deploymentId)
+    data['deployment'] = np.where(isinstance(data.deploymentID, list), data.deploymentID[0][0], data.deploymentId)
+    data["deployment"] = data.deployment.astype('str')
 
     data.deploymentID.value_counts()
     data.deploymentId.value_counts()
@@ -195,15 +196,18 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     
     #Loop over every deployment
     for folder in os.listdir(resized_folder_path):
+        print(folder)
         imageFolderPath = os.path.join(resized_folder_path, folder)
-        
+        print(imageFolderPath)
         #Check if it is a folder, not a file
         if os.path.isdir(imageFolderPath):
-            
+            print("into 203")
             annotations_deployment = []
             image_names_sequences = []
-    
-            data_deployment = data.loc[data['deployment'] == folder]
+
+            is_deployment = data["deployment"] == folder
+            data_deployment = data[is_deployment]
+
             sequences = np.unique(data_deployment.sequenceID, return_inverse = True)
             
             for seq in sequences:
