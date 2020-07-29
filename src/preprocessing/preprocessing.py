@@ -249,12 +249,14 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                         images_sequence = images_sequence.append(pd.DataFrame([image, name]).T)
 
                 images_sequence.columns = ['Image', 'ImageName']
+
+                # remove missing images from images_sequence
+                is_image = images_sequence["Image"] != ""
+                images_sequence = images_sequence[is_image]
                 
                 if len(images_sequence) == len(row.ImagesNames) and len(images_sequence) > 0: #All images available
 
-                    #remove missing images from images_sequence
-                    is_image = images_sequence["Image"] != ""
-                    images_sequence = images_sequence[is_image]
+
                     
                     #Import sequence
                     images_matrices = []
@@ -468,6 +470,8 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                         #Save smallest box and standard box
                         deployment.set_value(deployment.index[i-1], 'box_standard', box_list)
                         deployment.set_value(deployment.index[i-1], 'box_small', box_list_small)
+                else:
+                    continue
                         
             #Save deployment
             if total_output is None:
