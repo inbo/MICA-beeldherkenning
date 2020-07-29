@@ -208,7 +208,12 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             is_deployment = data["deployment"] == folder
             data_deployment = data[is_deployment]
 
-            sequences = np.unique(data_deployment.sequenceID, return_inverse = True)
+            #data_deployment['sequenceID'] = data_deployment.sequenceID.index.to_string()
+            #data.sequenceID.dtype
+            sequences = data_deployment.sequenceID.values[:,0]
+            sequences = sequences.tolist()
+            data_deployment = data_deployment.drop(["sequenceID"], axis=1)
+            data_deployment["sequenceID"] = sequences
             
             for seq in sequences:
                 image_names_sequences.append(data_deployment.loc[data_deployment['sequenceID'] == seq].filename.tolist())
