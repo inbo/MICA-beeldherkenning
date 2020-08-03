@@ -227,12 +227,12 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             lengths = [len(i) for i in image_names_sequences]
             deployment = pd.DataFrame({'ImagesNames': image_names_sequences,'SequenceID': sequences, 'Length':lengths, 'Annotation':annotations_deployment}) #Eventueel nog andere info toevoegen zoals aantal dieren.
             deployment['box_standard'] = ""
-            deployment['box_small']= ""
-            deployment['deployment']= folder
+            deployment['box_small'] = ""
+            deployment['deployment'] = folder
     
             #Loop over every sequence of the deployment
             for i, row in enumerate(deployment.itertuples(), 1):
-                
+
                 # Import images sequence
                 images_sequence = pd.DataFrame()
                 for img in row.ImagesNames:
@@ -253,205 +253,218 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                 # remove missing images from images_sequence
                 is_image = images_sequence["Image"] != ""
                 images_sequence = images_sequence[is_image]
-                
+
                 if len(images_sequence) == len(row.ImagesNames) and len(images_sequence) > 0: #All images available
 
-
-                    
                     #Import sequence
                     images_matrices = []
-                    series = [] 
+                    series = []
                     box_list = []
                     box_list_small = []
                     image_type = []
-                    
+
                     #Import first image to determine the size of the black border for the whole sequence.
                     image_border = images_sequence.iloc[0]['Image']
                     border = black_border(image_border)
-                    
+
                     for rows in images_sequence.itertuples():
                         image = rows.Image
                         image = image.crop(border)
-                        
+
                         #Check if image is a greyscale image
-                        if len(set(image.getpixel((length_standard_box,length_standard_box)))) == 1 & len(set(image.getpixel((height_standard_box,height_standard_box)))) == 1: 
+                        if len(set(image.getpixel((length_standard_box,length_standard_box)))) == 1 & len(set(image.getpixel((height_standard_box,height_standard_box)))) == 1:
                             image = image.convert('L')
                             image_type.append('grey')
                         else:
                             image_type.append('color')
-    
+
                         series.append(image)
                         images_matrices.append(np.asarray(image))
-        
+
                     #Valid sequence? (Remove control images)
                     dim_images = [len(k.shape) for k in images_matrices]
-                    if row.Length >= 10 and len(set(dim_images)) == 1:
-                        
+                    print("row length =")
+                    print(row.Length)
+                    print("len(set(dim_images))")
+                    print(len(set(dim_images)))
+
+
+                        print("if = True")
+                        test = "1"
+
                         #Calculate the median value of every pixel to determine the background
                         dim = images_matrices[0].ndim
                         image_stack = np.concatenate([im[..., None] for im in images_matrices], axis=dim)
                         median_array = np.median(image_stack, axis=dim)
-                        median_image = Image.fromarray(median_array.astype('uint8'))    
-                          
+                        median_image = Image.fromarray(median_array.astype('uint8'))
+
                         #Image size
                         image_length = series[0].size[0]
                         image_height = series[0].size[1]
-                        
+
                         #Maximum number of pixels difference
                         max_pixel_diff = image_length*image_height*0.6
-                        
+
                         #Select objects
                         for img in series:
-                            
+
                             #Difference with background
                             diff = ImageChops.difference(median_image, img).convert('L')
-                            
+
                             #MinFilter
                             filter = diff.filter(ImageFilter.MinFilter(size=9))
-                            
+
                             #Number of pixels that are different
                             pixels_filter = cv2.countNonZero(np.asarray(filter))
                             box_filter = filter.getbbox()
-                            
+                            print("box_filter =")
+                            print(box_filter)
+
                             #No (significant) difference with background
                             if not isinstance(box_filter, tuple) or pixels_filter < min_pixel_diff :
+                                print("No (significant) difference with background")
                                 length_box_filter = 0
                                 height_box_filter = 0
                                 box_filter = ()
-                                
+
                                 box_list.append(box_filter)
                                 box_list_small.append(box_filter)
-                            
+
                             #To much difference with background
                             elif pixels_filter > max_pixel_diff:
+                                print("To much difference with background")
                                 box_object_list_small = ()
                                 box_object_list = devide_box(img.getbbox(), length_standard_box, height_standard_box, image_length, image_height)
-                                                      
+
                                 box_list.append(box_object_list)
                                 box_list_small.append(box_object_list_small)
-                                
-                            else: 
+
+                            else:
                                 length_box_filter = size_box(box_filter)[0]
                                 height_box_filter = size_box(box_filter)[1]
-                            
+
                                 #Box after filtering is smaller than standard box
                                 if length_box_filter < length_standard_box and height_box_filter < height_standard_box:
                                     box = standard_box(box_filter, length_standard_box, height_standard_box, image_length, image_height)
                                     box_list.append(box)
                                     box_list_small.append(box_filter)
-                                
+
                                 #Box after filtering is larger than standard box
                                 else:
                                     #Edge detection
                                     edge = roberts(filter)
-                                    
+
                                     #MinFilter after edge detection
                                     edge = (edge != 0).astype(int)
                                     edge = Image.fromarray(edge.astype('uint8')).filter(ImageFilter.MinFilter(size=3))
                                     edge = Image.fromarray(np.asarray(edge).astype('uint8')).filter(ImageFilter.MinFilter(size=3))
-                                    
+
                                     #Binary closing
                                     closing = ndi.binary_closing(edge, structure=struct, iterations=iter_closing, output=None, origin=0)
-                            
+
                                     #Connected component labeling
                                     connect = measure.label(closing, neighbors=8, background=0, return_num=True)
                                     counts = np.bincount(connect[0].flatten())
-                                
+
                                     #Box after connected component labeling
                                     box = Image.fromarray(closing.astype('uint8')).getbbox()
                                     if not isinstance(box, tuple):
                                         length_box = 0
                                         height_box = 0
-                                        box = ()      
+                                        box = ()
                                     else:
                                         length_box = size_box(box)[0]
                                         height_box = size_box(box)[1]
-                                
+
                                     #Box not empty
                                     if length_box != 0:
-                                        
+
                                         #Box after connected component labeling is larger than standard box
                                         if length_box > length_standard_box or height_box > height_standard_box:
-                                            
+
                                             #Boxes around objects
                                             box_object_list = []
                                             box_object_list_small = []
-                                            
+
                                             for a in range(1, (connect[1])+1):
-                                                
+
                                                 if counts[a] > min_pixel_object:
-                        
+
                                                     box_object = Image.fromarray((connect[0]==a).astype('uint8')).getbbox()
                                                     box_object_list_small.append(box_object)
-                                                    
+
                                                     length_box_object = size_box(box_object)[0]
                                                     height_box_object = size_box(box_object)[1]
-                                                    
+
                                                     #Box around object bigger than standard box
                                                     if length_box_object > length_standard_box or height_box_object > height_standard_box:
-                                                        
+
                                                         boxes = devide_box(box_object, length_standard_box, height_standard_box, image_length, image_height)
                                                         box_object_list += boxes
-                                                        
+
                                                     #Box around object is smaller than standard box
                                                     else:
                                                         box_object = standard_box(box_object,length_standard_box,height_standard_box, image_length, image_height)
                                                         box_object_list.append(box_object)
-                                            
+
                                             if not box_object_list:
                                                 box_object_list = ()
                                                 box_object_list_small = ()
                                             box_list.append(box_object_list)
                                             box_list_small.append(box_object_list_small)
-                                     
-                                        
+
+
                                         #Box after connected component labeling is smaller than standard box
                                         else:
                                             box_list_small.append(box)
                                             box = standard_box(box,length_standard_box,height_standard_box, image_length, image_height)
                                             box_list.append(box)
-                                    
+
                                     #Empty box
-                                    else: 
+                                    else:
                                         box_list.append(box)
                                         box_list_small.append(box)
-                                    
-                            
+
+
                         #Save sequence preprocessing data
                         if all(isinstance(x, (tuple)) for x in box_list):
+                            print("432 = True")
                             box_list = [[elem] for elem in box_list]
                             df_standard = pd.DataFrame([box_list]).transpose()
                         else:
+                            print("432 = False")
                             lengths = []
                             for l in range(len(box_list)):
                                 item = box_list[l]
                                 if isinstance(item, (tuple)):
-                                    box_list[l] = [item]       
+                                    box_list[l] = [item]
                                 lengths.append(len(box_list[l]))
-                                
+
                             if all(lengths[0] == items for items in lengths):
                                 df_standard = pd.DataFrame([box_list]).transpose()
                             else:
                                 df_standard = pd.DataFrame(np.array(box_list).reshape(len(row.ImagesNames),-1))
-        
-        
+
+
                         if all(isinstance(x, (tuple)) for x in box_list_small):
                             box_list_small = [[elem] for elem in box_list_small]
                             df_small = pd.DataFrame([box_list_small]).transpose()
-                            
+                            print("450 = True")
+
                         else:
+                            print("450 = False")
                             lengths = []
                             for l in range(len(box_list_small)):
                                 item_small = box_list_small[l]
                                 if isinstance(item_small, (tuple)):
-                                    box_list_small[l] = [item_small]        
+                                    box_list_small[l] = [item_small]
                                 lengths.append(len(box_list_small[l]))
-                                
+
                             if all(lengths[0] == items for items in lengths):
                                 df_small = pd.DataFrame([box_list_small]).transpose()
                             else:
                                 df_small = pd.DataFrame(np.array(box_list_small).reshape(len(row.ImagesNames),-1))
-        
+
                         boxes_sequence = pd.concat([df_standard,df_small], axis=1)
                         boxes_sequence.columns = ['box_standard', 'box_small']
                         boxes_sequence['deployment'] = folder
@@ -461,16 +474,17 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                             seq_row.annotation = row.Annotation
                         boxes_sequence['image_name'] = pd.DataFrame(row.ImagesNames)
                         boxes_sequence['image_type'] = pd.DataFrame(image_type)
-                        
+
                         if boxes_output is None:
                             boxes_output = boxes_sequence
                         else:
                             boxes_output = pd.concat([boxes_output, boxes_sequence], axis = 0)
-                        
+
                         #Save smallest box and standard box
                         deployment.set_value(deployment.index[i-1], 'box_standard', box_list)
                         deployment.set_value(deployment.index[i-1], 'box_small', box_list_small)
                 else:
+                    print("missing")
                     continue
                         
             #Save deployment
