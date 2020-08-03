@@ -482,8 +482,10 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                             boxes_output = pd.concat([boxes_output, boxes_sequence], axis = 0)
 
                         #Save smallest box and standard box
-                        deployment.set_value(deployment.index[i-1], 'box_standard', box_list)
-                        deployment.set_value(deployment.index[i-1], 'box_small', box_list_small)
+                        #deployment.set_value(deployment.index[i-1], 'box_standard', box_list)
+                        #deployment.set_value(deployment.index[i-1], 'box_small', box_list_small)
+                        deployment.box_standard[i-1] = box_list
+                        deployment.box_small[i-1] = box_list_small
                 else:
                     print("missing")
                     continue
