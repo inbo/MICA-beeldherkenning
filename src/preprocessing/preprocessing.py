@@ -288,6 +288,7 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                     print("len(set(dim_images))")
                     print(len(set(dim_images)))
 
+                    if row.Length >= 10 or len(set(dim_images)) == 1:
 
                         print("if = True")
                         test = "1"
