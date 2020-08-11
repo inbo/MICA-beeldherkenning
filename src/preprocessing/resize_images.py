@@ -61,7 +61,7 @@ def resize_images(general_folder_path, resized_folder_path):
         imageFolderPath = os.path.join(general_folder_path, folder)
         
         #Check if it is a folder, not a file and if deployment is annotated
-        if os.path.isdir(imageFolderPath) and folder in deployments and folder not in os.listdir(resized_folder_path):
+        if os.path.isdir(imageFolderPath) and folder in deployments:
             imagePath = glob.glob(imageFolderPath + '/*.JPG')
             
             if not os.path.exists(os.path.join(resized_folder_path, folder)):
