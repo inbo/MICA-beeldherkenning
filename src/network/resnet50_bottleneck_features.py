@@ -2,23 +2,54 @@ import os
 from ast import literal_eval
 import pandas as pd
 import numpy as np
-from yaml import load
+import yaml
 
 from sklearn.preprocessing import LabelEncoder
 from keras.applications import ResNet50
 
-from network.functions_network import (group_birds, 
+from src.network.functions_network import (group_birds,
                                        DataGenerator, 
                                        split_train_val_test_bottleneck)
 
 # Load configuration file
-with open("config.yml") as yaml_config:
-    config = load(yaml_config)
+root = os.getcwd()
+if 'mica-beeldherkenning' in root:
+    print(root)
+else:
+    root = os.path.join(os.getcwd(),'mica-beeldherkenning')
+
+print(root)
+config_path = os.path.join(root,'src', 'config.yml')
+
+with open(config_path) as file:
+    config = yaml.load(file, Loader=yaml.FullLoader)
+print(config)
+
+general_folder_path = config['general_folder_path']
+general_folder_path = general_folder_path.replace("../", "")
+general_folder_path = general_folder_path.replace("/", os.sep)
+general_folder_path = os.path.join(root, general_folder_path)
+resized_folder_path = config['resized_folder_path']
+resized_folder_path = resized_folder_path.replace("../", "")
+resized_folder_path = resized_folder_path.replace("/", os.sep)
+resized_folder_path = os.path.join(root, resized_folder_path)
+preprocessing_output_path = config['preprocessing_output_path']
+preprocessing_output_path = preprocessing_output_path.replace("../", "")
+preprocessing_output_path = preprocessing_output_path.replace("/", os.sep)
+preprocessing_output_path = os.path.join(root, preprocessing_output_path)
+bottleneck_features_output_path = config['bottleneck_features_output_path']
+bottleneck_features_output_path = bottleneck_features_output_path.replace("../", "")
+bottleneck_features_output_path = bottleneck_features_output_path.replace("/", os.sep)
+bottleneck_features_output_path = os.path.join(root, bottleneck_features_output_path)
+
+print(general_folder_path)
+print(resized_folder_path)
+print(preprocessing_output_path)
     
 #Import preprocessing data
-data = pd.read_csv(os.path.join(config['preprocessing_output_path'],'boxes_preprocessing_single.csv'), sep=';')
+data = pd.read_csv(os.path.join(preprocessing_output_path,'boxes_preprocessing_single.csv'), sep=';')
 data['annotation_literal'] = data['annotation'].apply(literal_eval)
-data['box_standard'] = data['box_standard'].apply(literal_eval)
+#data['box_standard'] = data['box_standard'].apply(literal_eval)
 
 #Select sequences with only one label
 data = data.loc[data['annotation_literal'].str.len() == 1] 
@@ -35,7 +66,7 @@ map_classes = dict(zip(le.classes_, range(len(le.classes_))))
 classes = len(map_classes)
 
 #Save data corresponding to the bottleneck features
-data.to_csv(os.path.join(config['bottleneck_features_output_path'],'bottleneck_data.csv'), index=False, sep=';')
+data.to_csv(os.path.join(bottleneck_features_output_path,'bottleneck_data.csv'), index=False, sep=';')
 
 #Image size
 dim_x = 270
@@ -55,8 +86,8 @@ generator = DataGenerator(data, dim_x = dim_x, dim_y = dim_y, dim_z = dim_z,
 
 #Extract and save bottleneck features
 bottleneck_features = model.predict_generator(generator, steps_per_epoch)
-np.save(os.path.join(config['bottleneck_features_output_path'], 'bottleneck_features.npy'), bottleneck_features)
+np.save(os.path.join(bottleneck_features_output_path, 'bottleneck_features.npy'), bottleneck_features)
 
 #When training:
 #Split bottleneck features and data into training, validation and test data
-train, validation, test, bottleneck_features_train, bottleneck_features_validation, bottleneck_features_test = split_train_val_test_bottleneck(data, bottleneck_features, 0.5, 0.25, config['bottleneck_features_output_path'])
+train, validation, test, bottleneck_features_train, bottleneck_features_validation, bottleneck_features_test = split_train_val_test_bottleneck(data, bottleneck_features, 0.5, 0.25, bottleneck_features_output_path)
