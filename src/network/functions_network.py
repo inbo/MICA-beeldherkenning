@@ -16,7 +16,7 @@ import keras.backend as K
 from keras.preprocessing.image import img_to_array, random_shift, random_rotation, random_shear, random_zoom #Additional data augmentation option. Add to DataGenerator.
 from keras.applications.resnet50 import preprocess_input
 
-from preprocessing.def_functions import black_border
+from src.preprocessing.def_functions import black_border
 
 ############################################################################################
 def randomHorizontalFlip(image, p=0.5):
@@ -68,8 +68,8 @@ class DataGenerator(object):
     def _get_batch_images(self, indexes):
         """Return the images that correspond to the current batch"""
         batch_images = np.zeros((len(indexes), self.dim_x, self.dim_y, self.dim_z))
-        
-        datapath = resized_folder_path
+
+        datapath = os.path.join(os.getcwd(),'data', 'interim', 'resized')
 
         # Fill up container
         for i, ix in enumerate(indexes):
