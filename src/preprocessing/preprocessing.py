@@ -213,7 +213,7 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
 
             #data_deployment['sequenceID'] = data_deployment.sequenceID.index.to_string()
             #data.sequenceID.dtype
-            sequences = data_deployment.sequenceID.values[:,0]
+            sequences = data_deployment.sequence.values
             sequences = sequences.tolist()
             data_deployment = data_deployment.drop(["sequenceID"], axis=1)
             data_deployment["sequenceID"] = sequences
@@ -256,6 +256,8 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
 
                 if len(images_sequence) == len(row.ImagesNames) and len(images_sequence) > 0: #All images available
 
+                    print("259 = True")
+
                     #Import sequence
                     images_matrices = []
                     series = []
@@ -288,7 +290,7 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                     print("len(set(dim_images))")
                     print(len(set(dim_images)))
 
-                    if row.Length >= 10 or len(set(dim_images)) == 1:
+                    if row.Length >= 10 and len(set(dim_images)) == 1:
 
                         print("if = True")
                         test = "1"
