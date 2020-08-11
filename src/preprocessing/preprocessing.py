@@ -502,9 +502,12 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     boxes_single = pd.DataFrame()
     for i, row in boxes_output.iterrows():
         for box in row.box_standard:
-            if len(box) != 0:
+            if not box:
+                print("box is empty")
+            else:
+                print(box)
                 boxes_single = boxes_single.append(row, ignore_index=True)
-                boxes_single['box_standard'].iloc[-1] = box
+                boxes_single['box_standard'].iloc[-1] = np.asarray(box, dtype=object)
             
     #Save data preprocessing        
     total_output.to_csv(os.path.join(preprocessing_output_path, 'data_preprocessing.csv'), index=False, sep=';')
