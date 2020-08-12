@@ -507,9 +507,22 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             else:
                 print(box)
                 boxes_single = boxes_single.append(row, ignore_index=True)
-                boxes_single['box_standard'].iloc[-1] = np.asarray(box, dtype=object)
-            
-    #Save data preprocessing        
+                res = []
+                temp = []
+                test_str = str(box)
+                for token in test_str.split(", "):
+                    num = int(token.replace("(", "").replace(")", ""))
+                    temp.append(num)
+                    if ")" in token:
+                        res.append(tuple(temp))
+                        temp = []
+                boxes_single['box_standard'].iloc[-1] = res
+
+
+
+
+
+    #Save data preprocessing
     total_output.to_csv(os.path.join(preprocessing_output_path, 'data_preprocessing.csv'), index=False, sep=';')
     boxes_output.to_csv(os.path.join(preprocessing_output_path, 'boxes_preprocessing.csv'), index=False, sep=';')
     data.to_csv(os.path.join(preprocessing_output_path, 'data_start_preprocessing.csv'), index=False, sep=';')
