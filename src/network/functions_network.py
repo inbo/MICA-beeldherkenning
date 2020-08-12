@@ -78,6 +78,7 @@ class DataGenerator(object):
             image = image.crop(black_border(image))
             test_str = self.df['box_standard'][ix]
             res = eval(test_str)
+            res = res[0]
             im = image.crop(res)
             im = img_to_array(im)
 
