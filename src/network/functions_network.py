@@ -76,7 +76,9 @@ class DataGenerator(object):
 
             image = Image.open(os.path.join(datapath, self.df['deployment'][ix] ,self.df['image_name'][ix]))
             image = image.crop(black_border(image))
-            im = image.crop(self.df['box_standard'][ix])                   
+            test_str = self.df['box_standard'][ix]
+            res = eval(test_str)
+            im = image.crop(res)
             im = img_to_array(im)
 
             if self.augmentation:
