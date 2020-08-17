@@ -221,8 +221,13 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             data_deployment.filename.value_counts()
             for seq in sequences:
                 print(seq)
-                image_names_sequences.append(data_deployment[data_deployment['sequenceID'] == seq].filename.tolist())
-                annotations_deployment.append(data_deployment[data_deployment['sequenceID'] == seq].Annotation.iloc[0])
+                if np.isnan(seq):
+                    print("seq missing")
+                    continue
+                else:
+                    image_names_sequences.append(data_deployment[data_deployment['sequenceID'] == seq].filename.tolist())
+                    data_deployment.ndim
+                    annotations_deployment.append(data_deployment[data_deployment['sequenceID'] == seq].Annotation.iloc[0])
     
             lengths = [len(i) for i in image_names_sequences]
             deployment = pd.DataFrame({'ImagesNames': image_names_sequences,'SequenceID': sequences, 'Length':lengths, 'Annotation':annotations_deployment}) #Eventueel nog andere info toevoegen zoals aantal dieren.
