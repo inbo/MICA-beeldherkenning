@@ -221,7 +221,7 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
             data_deployment.filename.value_counts()
             for seq in sequences:
                 print(seq)
-                if np.isnan(seq):
+                if  pd.isnull(seq):
                     print("seq missing")
                     continue
                 else:
