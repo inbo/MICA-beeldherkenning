@@ -3,6 +3,7 @@ from ast import literal_eval
 import pandas as pd
 import numpy as np
 import yaml
+import tensorflow as tf
 
 from sklearn.preprocessing import LabelEncoder
 from keras.applications import ResNet50
@@ -10,6 +11,21 @@ from keras.applications import ResNet50
 from src.network.functions_network import (group_birds,
                                        DataGenerator, 
                                        split_train_val_test_bottleneck)
+
+#from tensorflow.python.client import device_lib
+ #print(device_lib.list_local_devices())
+
+
+
+if tf.test.is_gpu_available():
+    print("using GPU")
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            tf.config.experimental.set_virtual_device_configuration(gpus[0], [
+                tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)])
+        except RuntimeError as e:
+            print(e)
 
 # Load configuration file
 root = os.getcwd()
@@ -48,7 +64,7 @@ print(preprocessing_output_path)
     
 #Import preprocessing data
 data = pd.read_csv(os.path.join(preprocessing_output_path,'boxes_preprocessing_single.csv'), sep=';')
-data['annotation_literal'] = data['annotation'].apply(literal_eval)
+data['annotation_literal'] = data['annotation']
 #data['box_standard'] = data['box_standard'].apply(literal_eval)
 
 #Select sequences with only one label
@@ -85,7 +101,7 @@ generator = DataGenerator(data, dim_x = dim_x, dim_y = dim_y, dim_z = dim_z,
                           batch_size=batch_size, augmentation=False, shuffle=False, mode='train').generate()
 
 #Extract and save bottleneck features
-bottleneck_features = model.predict_generator(generator, steps_per_epoch)
+bottleneck_features = model.predict(generator, steps_per_epoch)
 np.save(os.path.join(bottleneck_features_output_path, 'bottleneck_features.npy'), bottleneck_features)
 
 #When training:
