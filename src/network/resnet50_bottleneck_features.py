@@ -65,14 +65,16 @@ print(preprocessing_output_path)
 #Import preprocessing data
 data = pd.read_csv(os.path.join(preprocessing_output_path,'boxes_preprocessing_single.csv'), sep=';')
 data['annotation_literal'] = data['annotation']
-#data['box_standard'] = data['box_standard'].apply(literal_eval)
+data['box_standard'] = data['box_standard'].apply(literal_eval)
 
 #Select sequences with only one label
-data = data.loc[data['annotation_literal'].str.len() == 1] 
+#data = data.loc[data['annotation_literal'].str.len() == 1]
+#dit stuk code selecteerd enkel sequenties met een str length van het label == 1, dit is nooit het geval
+#In de data zitten wel sequenties met meerdere labels bvb eend en zwarte rat => een alternatief is dus wel nodig
 
-#Group all bird species into one class
+#Group all bird species into one class => willen we dit ?
 data['ann_animal'] = ""
-data['ann_animal'] = data['annotation_literal'].apply(group_birds)
+data['ann_animal'] = data['annotation_literal']
 
 #Encode labels
 le = LabelEncoder()
