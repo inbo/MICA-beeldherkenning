@@ -2,14 +2,45 @@ import os
 import numpy as np
 import pandas as pd
 
+
 from PIL import Image, ImageChops, ImageFilter
 from skimage import measure
 from skimage.filters import roberts
 from scipy import ndimage as ndi
 import cv2
+import yaml
 
-from preprocessing.def_functions import remove_dup_columns, black_border, standard_box, size_box, devide_box
+root = os.getcwd()
+if 'mica-beeldherkenning' in root:
+    print(root)
+else:
+    root = os.path.join(os.getcwd(),'mica-beeldherkenning')
 
+print(root)
+config_path = os.path.join(root,'src', 'config.yml')
+
+from src.preprocessing.def_functions import remove_dup_columns, black_border, standard_box, size_box, devide_box
+
+with open(config_path) as file:
+    config = yaml.load(file, Loader=yaml.FullLoader)
+print(config)
+
+general_folder_path = config['general_folder_path']
+general_folder_path = general_folder_path.replace("../", "")
+general_folder_path = general_folder_path.replace("/", os.sep)
+general_folder_path = os.path.join(root, general_folder_path)
+resized_folder_path = config['resized_folder_path']
+resized_folder_path = resized_folder_path.replace("../", "")
+resized_folder_path = resized_folder_path.replace("/", os.sep)
+resized_folder_path = os.path.join(root, resized_folder_path)
+preprocessing_output_path = config['preprocessing_output_path']
+preprocessing_output_path = preprocessing_output_path.replace("../", "")
+preprocessing_output_path = preprocessing_output_path.replace("/", os.sep)
+preprocessing_output_path = os.path.join(root, preprocessing_output_path)
+
+print(general_folder_path)
+print(resized_folder_path)
+print(preprocessing_output_path)
 
 def preprocessing(general_folder_path, resized_folder_path, preprocessing_output_path):
     
@@ -39,10 +70,21 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     RATIO = 0.5
     
     #Import Agouti export files
-    observations = pd.read_csv(os.path.join(general_folder_path, 'observations.csv'))
-    assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory = False)
-    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'))
-    
+    observations = pd.read_csv(os.path.join(general_folder_path, 'observations.csv'), index_col=0)
+    observations = observations.convert_dtypes()
+    assets = pd.read_csv(os.path.join(general_folder_path, 'assets.csv'), low_memory=False, index_col=0)
+    assets = assets.convert_dtypes()
+    setup = pd.read_csv(os.path.join(general_folder_path, 'pickup_setup.csv'), na_values='NULL', keep_default_na=False, index_col=0)
+    setup = setup.convert_dtypes()
+
+    setup.isSetupPickup.value_counts()
+    observations.animalVernacularName.value_counts(dropna=False)
+
+    observations.head()
+
+    for col in observations.columns:
+        print(col)
+
     #Combine annotations for sequences with multiple annotations
     list_columns = ['animalCount','animalTaxonID','animalIsDomesticated','animalScientificName','animalVernacularName','animalSex','animalAge', 'animalBehavior', 'deploymentID']
     observations_unique = pd.DataFrame()   
@@ -52,33 +94,83 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     observations_unique = remove_dup_columns(observations_unique)
     
     #Join annotations and pickup-setup data
-    ann = assets.set_index('sequence').join(observations_unique.set_index('sequenceID'))
-    ann.index.name = 'sequenceId'
-    data = ann.merge(setup, on='sequenceId', how='left')
+    ann = assets.merge(observations_unique, left_on='sequence', right_on='sequenceID', how='outer')
+    data = ann.merge(setup, left_on='sequence', right_on='sequenceId', how='outer')
     data.reset_index(level=0, inplace=True)
     data.rename(columns={'index': 'sequenceID'}, inplace=True)
-    data = data.drop([ 'id','type','originalFilename','destination','directory','exiftoolData','order',
+    data["filename"] = data["originalFilename"]
+    data = data.drop(['id','type','originalFilename','destination','directory','exiftoolData','order',
                       'createdAt','isFavourite','observations','isTimeLapse','deployment'], axis=1)
+
+    data.filename.value_counts()
         
     #Combine deploymentID of observation and pickup-setup into one column    
     data['deployment'] = ""
-    for i, row in data.iterrows():
-        if isinstance(row.deploymentID, list):
-            row.deployment = row.deploymentID[0]
-        else:
-            row.deployment = row.deploymentId
+    data['deployment'] = np.where(isinstance(data.deploymentID, list), data.deploymentID[0][0], data.deploymentId)
+    data["deployment"] = data.deployment.astype('str')
+
+    data.deploymentID.value_counts()
+    data.deploymentId.value_counts()
+    data.deployment.value_counts()
+
     data = data.drop(['deploymentId', 'deploymentID'], axis=1)       
             
     #Combine annotations from observations and pickup-setup into one column     
     data['Annotation'] = ""
-    for i, row in data.iterrows():
-        if row.isSetupPickup == 'WAAR':
-            row.Annotation = ['PickupSetup']
-        elif row.isBlank == 'WAAR':
-            row.Annotation = ['Blank']
-        elif isinstance(row.animalVernacularName, list):
-            row.Annotation = row.animalVernacularName
-    
+    #Dit stuk werkt niet naar wens. rijen met isSetupPickup == True, row.isBlank == True of row.animalVernacularName
+    #Krijgen niet de gewenste annotatie => hieronder een poging om dit te herschrijven.
+    # for i, row in data.iterrows():
+     #   if row.isSetupPickup == 'true':
+      #      row.Annotation = 'PickupSetup'
+       # elif row.isBlank == 'true':
+        #    row.Annotation = 'Blank'
+    #    else:
+     #       row.Annotation = row.animalVernacularName
+    data_backup = data
+    data_backup.isSetupPickup.value_counts()
+    data_backup.isBlank.value_counts()
+    data_backup.animalVernacularName.value_counts()
+    #Na de aanpassing van de merge van inner (default) naar outer  zitten er terug setups en blanks in de data
+    #Daarom vullen we hier de kolom annotation hieronder manueel eerst met PickupSetup, vervolgens met Blank en dan met
+    #animalVernacularName
+    is_missing_setup = data["isSetupPickup"] == ''
+    not_missing_setup = data["isSetupPickup"] != ''
+    data_missing_setup = data[is_missing_setup]
+    data_Nmissing_setup = data[not_missing_setup]
+
+    data_missing_setup.isSetupPickup = 'false'
+    data_missing_setup.isSetupPickup.value_counts()
+
+    data = data_Nmissing_setup.append(data_missing_setup)
+
+    data["isBlank"] =  data["isBlank"].astype('str')
+    data.isBlank.dtype
+
+    is_missing_blank = data["isBlank"] == ''
+    is_Nmissing_blank = data["isBlank"] != ''
+    data_missing_blank = data[is_missing_blank]
+    data_Nmissing_blank = data[is_Nmissing_blank]
+
+    data_missing_blank.isBlank = 'false'
+    data_missing_blank.isBlank.value_counts(dropna= False)
+
+    data = data_Nmissing_blank.append(data_missing_blank)
+
+    #Remove "unnamed" columns
+    data.drop(data.columns[data.columns.str.contains('unnamed', case=False)], axis=1, inplace=True)
+    for col in data.columns:
+        print(col)
+
+    data['Annotation'] = np.where(data.isSetupPickup == 'true', 'PickupSetup', data.Annotation)
+    data['Annotation'] = np.where(data.isBlank == 'true', 'Blank', data.Annotation)
+    data['Annotation'] = np.where(data.Annotation == "",data.animalVernacularName, data.Annotation)
+
+    #data.Annotation = data.animalVernacularName
+    data.isSetupPickup.value_counts()
+    data.isBlank.value_counts()
+    data.animalVernacularName.value_counts()
+    data.Annotation.value_counts(dropna= False) #=> Hieruit blijkt dat alle rijen een animalVernacularName hebben
+    data.Annotation.dtype
     #Remove row without annotation
     data['Annotation'].replace('', np.nan, inplace=True)
     data.dropna(subset=['Annotation'], inplace=True)
@@ -107,235 +199,280 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     
     #Loop over every deployment
     for folder in os.listdir(resized_folder_path):
+        print(folder)
         imageFolderPath = os.path.join(resized_folder_path, folder)
-        
+        print(imageFolderPath)
         #Check if it is a folder, not a file
         if os.path.isdir(imageFolderPath):
-            
+            print("into 203")
             annotations_deployment = []
             image_names_sequences = []
-    
-            data_deployment = data.loc[data['deployment'] == folder]
-            sequences = data_deployment.sequenceID.unique()
-            
+
+            is_deployment = data["deployment"] == folder
+            data_deployment = data[is_deployment]
+
+            #data_deployment['sequenceID'] = data_deployment.sequenceID.index.to_string()
+            #data.sequenceID.dtype
+            sequences = data_deployment.sequence.values
+            sequences = sequences.tolist()
+            data_deployment = data_deployment.drop(["sequenceID"], axis=1)
+            data_deployment["sequenceID"] = sequences
+
+            data_deployment.filename.value_counts()
             for seq in sequences:
-                image_names_sequences.append(data_deployment.loc[data_deployment['sequenceID'] == seq].filename.tolist())
-                annotations_deployment.append(data_deployment[data_deployment['sequenceID'] == seq].Annotation.iloc[0])
+                print(seq)
+                if  pd.isnull(seq):
+                    print("seq missing")
+                    continue
+                else:
+                    image_names_sequences.append(data_deployment[data_deployment['sequenceID'] == seq].filename.tolist())
+                    data_deployment.ndim
+                    annotations_deployment.append(data_deployment[data_deployment['sequenceID'] == seq].Annotation.iloc[0])
     
             lengths = [len(i) for i in image_names_sequences]
             deployment = pd.DataFrame({'ImagesNames': image_names_sequences,'SequenceID': sequences, 'Length':lengths, 'Annotation':annotations_deployment}) #Eventueel nog andere info toevoegen zoals aantal dieren.
             deployment['box_standard'] = ""
-            deployment['box_small']= ""
-            deployment['deployment']= folder
+            deployment['box_small'] = ""
+            deployment['deployment'] = folder
     
             #Loop over every sequence of the deployment
             for i, row in enumerate(deployment.itertuples(), 1):
-                
+
                 # Import images sequence
                 images_sequence = pd.DataFrame()
                 for img in row.ImagesNames:
-                    if os.path.isfile(os.path.join(resized_folder_path,folder,img)):
+                    print(img)
+                    path = os.path.join(resized_folder_path,folder,img)
+                    print(path)
+                    if os.path.isfile(path):
                         image = Image.open(os.path.join(resized_folder_path, folder, img))
                         name = (image.filename).split('\\')[-1]
-                        images_sequence = images_sequence.append(pd.DataFrame([image, name]).T) 
+                        images_sequence = images_sequence.append(pd.DataFrame([image, name]).T)
+                    else: #provide logic for missing images
+                        image = ""
+                        name = ""
+                        images_sequence = images_sequence.append(pd.DataFrame([image, name]).T)
+
                 images_sequence.columns = ['Image', 'ImageName']
-                
+
+                # remove missing images from images_sequence
+                is_image = images_sequence["Image"] != ""
+                images_sequence = images_sequence[is_image]
+
                 if len(images_sequence) == len(row.ImagesNames) and len(images_sequence) > 0: #All images available
-                    
+
+                    print("259 = True")
+
                     #Import sequence
                     images_matrices = []
-                    series = [] 
+                    series = []
                     box_list = []
                     box_list_small = []
                     image_type = []
-                    
+
                     #Import first image to determine the size of the black border for the whole sequence.
                     image_border = images_sequence.iloc[0]['Image']
                     border = black_border(image_border)
-                    
+
                     for rows in images_sequence.itertuples():
                         image = rows.Image
                         image = image.crop(border)
-                        
+
                         #Check if image is a greyscale image
-                        if len(set(image.getpixel((length_standard_box,length_standard_box)))) == 1 & len(set(image.getpixel((height_standard_box,height_standard_box)))) == 1: 
+                        if len(set(image.getpixel((length_standard_box,length_standard_box)))) == 1 & len(set(image.getpixel((height_standard_box,height_standard_box)))) == 1:
                             image = image.convert('L')
                             image_type.append('grey')
                         else:
                             image_type.append('color')
-    
+
                         series.append(image)
                         images_matrices.append(np.asarray(image))
-        
+
                     #Valid sequence? (Remove control images)
                     dim_images = [len(k.shape) for k in images_matrices]
+                    print("row length =")
+                    print(row.Length)
+                    print("len(set(dim_images))")
+                    print(len(set(dim_images)))
+
                     if row.Length >= 10 and len(set(dim_images)) == 1:
-                        
+
+                        print("if = True")
+                        test = "1"
+
                         #Calculate the median value of every pixel to determine the background
                         dim = images_matrices[0].ndim
                         image_stack = np.concatenate([im[..., None] for im in images_matrices], axis=dim)
                         median_array = np.median(image_stack, axis=dim)
-                        median_image = Image.fromarray(median_array.astype('uint8'))    
-                          
+                        median_image = Image.fromarray(median_array.astype('uint8'))
+
                         #Image size
                         image_length = series[0].size[0]
                         image_height = series[0].size[1]
-                        
+
                         #Maximum number of pixels difference
                         max_pixel_diff = image_length*image_height*0.6
-                        
+
                         #Select objects
                         for img in series:
-                            
+
                             #Difference with background
                             diff = ImageChops.difference(median_image, img).convert('L')
-                            
+
                             #MinFilter
                             filter = diff.filter(ImageFilter.MinFilter(size=9))
-                            
+
                             #Number of pixels that are different
                             pixels_filter = cv2.countNonZero(np.asarray(filter))
                             box_filter = filter.getbbox()
-                            
+                            print("box_filter =")
+                            print(box_filter)
+
                             #No (significant) difference with background
                             if not isinstance(box_filter, tuple) or pixels_filter < min_pixel_diff :
+                                print("No (significant) difference with background")
                                 length_box_filter = 0
                                 height_box_filter = 0
                                 box_filter = ()
-                                
+
                                 box_list.append(box_filter)
                                 box_list_small.append(box_filter)
-                            
+
                             #To much difference with background
                             elif pixels_filter > max_pixel_diff:
+                                print("To much difference with background")
                                 box_object_list_small = ()
                                 box_object_list = devide_box(img.getbbox(), length_standard_box, height_standard_box, image_length, image_height)
-                                                      
+
                                 box_list.append(box_object_list)
                                 box_list_small.append(box_object_list_small)
-                                
-                            else: 
+
+                            else:
                                 length_box_filter = size_box(box_filter)[0]
                                 height_box_filter = size_box(box_filter)[1]
-                            
+
                                 #Box after filtering is smaller than standard box
                                 if length_box_filter < length_standard_box and height_box_filter < height_standard_box:
                                     box = standard_box(box_filter, length_standard_box, height_standard_box, image_length, image_height)
                                     box_list.append(box)
                                     box_list_small.append(box_filter)
-                                
+
                                 #Box after filtering is larger than standard box
                                 else:
                                     #Edge detection
                                     edge = roberts(filter)
-                                    
+
                                     #MinFilter after edge detection
                                     edge = (edge != 0).astype(int)
                                     edge = Image.fromarray(edge.astype('uint8')).filter(ImageFilter.MinFilter(size=3))
                                     edge = Image.fromarray(np.asarray(edge).astype('uint8')).filter(ImageFilter.MinFilter(size=3))
-                                    
+
                                     #Binary closing
                                     closing = ndi.binary_closing(edge, structure=struct, iterations=iter_closing, output=None, origin=0)
-                            
+
                                     #Connected component labeling
                                     connect = measure.label(closing, neighbors=8, background=0, return_num=True)
                                     counts = np.bincount(connect[0].flatten())
-                                
+
                                     #Box after connected component labeling
                                     box = Image.fromarray(closing.astype('uint8')).getbbox()
                                     if not isinstance(box, tuple):
                                         length_box = 0
                                         height_box = 0
-                                        box = ()      
+                                        box = ()
                                     else:
                                         length_box = size_box(box)[0]
                                         height_box = size_box(box)[1]
-                                
+
                                     #Box not empty
                                     if length_box != 0:
-                                        
+
                                         #Box after connected component labeling is larger than standard box
                                         if length_box > length_standard_box or height_box > height_standard_box:
-                                            
+
                                             #Boxes around objects
                                             box_object_list = []
                                             box_object_list_small = []
-                                            
+
                                             for a in range(1, (connect[1])+1):
-                                                
+
                                                 if counts[a] > min_pixel_object:
-                        
+
                                                     box_object = Image.fromarray((connect[0]==a).astype('uint8')).getbbox()
                                                     box_object_list_small.append(box_object)
-                                                    
+
                                                     length_box_object = size_box(box_object)[0]
                                                     height_box_object = size_box(box_object)[1]
-                                                    
+
                                                     #Box around object bigger than standard box
                                                     if length_box_object > length_standard_box or height_box_object > height_standard_box:
-                                                        
+
                                                         boxes = devide_box(box_object, length_standard_box, height_standard_box, image_length, image_height)
                                                         box_object_list += boxes
-                                                        
+
                                                     #Box around object is smaller than standard box
                                                     else:
                                                         box_object = standard_box(box_object,length_standard_box,height_standard_box, image_length, image_height)
                                                         box_object_list.append(box_object)
-                                            
+
                                             if not box_object_list:
                                                 box_object_list = ()
                                                 box_object_list_small = ()
                                             box_list.append(box_object_list)
                                             box_list_small.append(box_object_list_small)
-                                     
-                                        
+
+
                                         #Box after connected component labeling is smaller than standard box
                                         else:
                                             box_list_small.append(box)
                                             box = standard_box(box,length_standard_box,height_standard_box, image_length, image_height)
                                             box_list.append(box)
-                                    
+
                                     #Empty box
-                                    else: 
+                                    else:
                                         box_list.append(box)
                                         box_list_small.append(box)
-                                    
-                            
+
+
                         #Save sequence preprocessing data
                         if all(isinstance(x, (tuple)) for x in box_list):
+                            print("432 = True")
                             box_list = [[elem] for elem in box_list]
                             df_standard = pd.DataFrame([box_list]).transpose()
                         else:
+                            print("432 = False")
                             lengths = []
                             for l in range(len(box_list)):
                                 item = box_list[l]
                                 if isinstance(item, (tuple)):
-                                    box_list[l] = [item]       
+                                    box_list[l] = [item]
                                 lengths.append(len(box_list[l]))
-                                
+
                             if all(lengths[0] == items for items in lengths):
                                 df_standard = pd.DataFrame([box_list]).transpose()
                             else:
                                 df_standard = pd.DataFrame(np.array(box_list).reshape(len(row.ImagesNames),-1))
-        
-        
+
+
                         if all(isinstance(x, (tuple)) for x in box_list_small):
                             box_list_small = [[elem] for elem in box_list_small]
                             df_small = pd.DataFrame([box_list_small]).transpose()
-                            
+                            print("450 = True")
+
                         else:
+                            print("450 = False")
                             lengths = []
                             for l in range(len(box_list_small)):
                                 item_small = box_list_small[l]
                                 if isinstance(item_small, (tuple)):
-                                    box_list_small[l] = [item_small]        
+                                    box_list_small[l] = [item_small]
                                 lengths.append(len(box_list_small[l]))
-                                
+
                             if all(lengths[0] == items for items in lengths):
                                 df_small = pd.DataFrame([box_list_small]).transpose()
                             else:
                                 df_small = pd.DataFrame(np.array(box_list_small).reshape(len(row.ImagesNames),-1))
-        
+
                         boxes_sequence = pd.concat([df_standard,df_small], axis=1)
                         boxes_sequence.columns = ['box_standard', 'box_small']
                         boxes_sequence['deployment'] = folder
@@ -345,15 +482,20 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
                             seq_row.annotation = row.Annotation
                         boxes_sequence['image_name'] = pd.DataFrame(row.ImagesNames)
                         boxes_sequence['image_type'] = pd.DataFrame(image_type)
-                        
+
                         if boxes_output is None:
                             boxes_output = boxes_sequence
                         else:
                             boxes_output = pd.concat([boxes_output, boxes_sequence], axis = 0)
-                        
+
                         #Save smallest box and standard box
-                        deployment.set_value(deployment.index[i-1], 'box_standard', box_list)
-                        deployment.set_value(deployment.index[i-1], 'box_small', box_list_small)
+                        #deployment.set_value(deployment.index[i-1], 'box_standard', box_list)
+                        #deployment.set_value(deployment.index[i-1], 'box_small', box_list_small)
+                        deployment.box_standard[i-1] = box_list
+                        deployment.box_small[i-1] = box_list_small
+                else:
+                    print("missing")
+                    continue
                         
             #Save deployment
             if total_output is None:
@@ -365,15 +507,31 @@ def preprocessing(general_folder_path, resized_folder_path, preprocessing_output
     boxes_single = pd.DataFrame()
     for i, row in boxes_output.iterrows():
         for box in row.box_standard:
-            if len(box) != 0:
+            if not box:
+                print("box is empty")
+            else:
+                print(box)
                 boxes_single = boxes_single.append(row, ignore_index=True)
-                boxes_single['box_standard'].iloc[-1] = box
-            
-    #Save data preprocessing        
+                res = []
+                temp = []
+                test_str = str(box)
+                for token in test_str.split(", "):
+                    num = int(token.replace("(", "").replace(")", ""))
+                    temp.append(num)
+                    if ")" in token:
+                        res.append(tuple(temp))
+                        temp = []
+                boxes_single['box_standard'].iloc[-1] = res
+
+
+
+
+
+    #Save data preprocessing
     total_output.to_csv(os.path.join(preprocessing_output_path, 'data_preprocessing.csv'), index=False, sep=';')
     boxes_output.to_csv(os.path.join(preprocessing_output_path, 'boxes_preprocessing.csv'), index=False, sep=';')
     data.to_csv(os.path.join(preprocessing_output_path, 'data_start_preprocessing.csv'), index=False, sep=';')
     boxes_single.to_csv(os.path.join(preprocessing_output_path, 'boxes_preprocessing_single.csv'), index=False, sep=';')
 
 if __name__ == '__main__':
-    preprocessing()
+    preprocessing(general_folder_path, resized_folder_path, preprocessing_output_path)

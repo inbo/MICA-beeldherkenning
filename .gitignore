@@ -102,3 +102,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+.Rproj.user
+data/Agouti_raw/assets.csv
+src/.Rhistory
